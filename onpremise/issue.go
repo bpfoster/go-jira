@@ -532,13 +532,10 @@ type SearchWithPostOptions struct {
 	StartAt int `json:"startAt,omitempty" url:"startAt,omitempty"`
 	// MaxResults: The maximum number of projects to return per page. Default: 50.
 	MaxResults int `json:"maxResults,omitempty" url:"maxResults,omitempty"`
-	// Expand: Expand specific sections in the returned issues
-	Expand       []string `json:"expand,omitempty" url:"expand,omitempty"`
 	Fields       []string `json:"fields"`
-	FieldsByKeys bool     `json:"fieldsByKeys"`
-	JQL          string   `json:"JQL"`
+	JQL          string   `json:"jql"`
 	// ValidateQuery: The validateQuery param offers control over whether to validate and how strictly to treat the validation. Default: strict.
-	ValidateQuery string `json:"validateQuery,omitempty" url:"validateQuery,omitempty"`
+	ValidateQuery bool `json:"validateQuery,omitempty" url:"validateQuery,omitempty"`
 }
 
 // searchResult is only a small wrapper around the Search (with JQL) method
@@ -1106,7 +1103,7 @@ func (s *IssueService) Search(ctx context.Context, jql string, options *SearchOp
 // TODO Double check this method if this works as expected, is using the latest API and the response is complete
 func (s *IssueService) SearchWithPost(ctx context.Context, options *SearchWithPostOptions) ([]Issue, *Response, error) {
 	u := url.URL{
-		Path: "rest/api/3/search",
+		Path: "rest/api/2/search",
 	}
 
 	req, err := s.client.NewRequest(ctx, http.MethodPost, u.String(), options)
