@@ -527,6 +527,17 @@ type SearchOptions struct {
 	ValidateQuery string `url:"validateQuery,omitempty"`
 }
 
+type SearchWithPostOptions struct {
+	// StartAt: The starting index of the returned projects. Base index: 0.
+	StartAt int `json:"startAt,omitempty" url:"startAt,omitempty"`
+	// MaxResults: The maximum number of projects to return per page. Default: 50.
+	MaxResults int      `json:"maxResults,omitempty" url:"maxResults,omitempty"`
+	Fields     []string `json:"fields"`
+	JQL        string   `json:"jql"`
+	// ValidateQuery: The validateQuery param offers control over whether to validate and how strictly to treat the validation. Default: strict.
+	ValidateQuery string `json:"validateQuery,omitempty" url:"validateQuery,omitempty"`
+}
+
 // searchResult is only a small wrapper around the Search (with JQL) method
 // to be able to parse the results
 type searchResult struct {
@@ -613,7 +624,7 @@ type RemoteLinkStatus struct {
 // This can be an issue id, or an issue key.
 // If the issue cannot be found via an exact match, Jira will also look for the issue in a case-insensitive way, or by looking to see if the issue was moved.
 //
-// The given options will be appended to the query string
+// # The given options will be appended to the query string
 //
 // Jira API docs: https://docs.atlassian.com/jira/REST/latest/#api/2/issue-getIssue
 func (s *IssueService) GetWithContext(ctx context.Context, issueID string, options *GetQueryOptions) (*Issue, *Response, error) {
@@ -1134,6 +1145,31 @@ func (s *IssueService) Search(jql string, options *SearchOptions) ([]Issue, *Res
 	return s.SearchWithContext(context.Background(), jql, options)
 }
 
+// SearchWithPost will search for tickets according to the options, suitable for JQL queries >2000 characters long.
+//
+// Jira API docs: https://developer.atlassian.com/jiradev/jira-apis/jira-rest-apis/jira-rest-api-tutorials/jira-rest-api-example-query-issues
+//
+// TODO Double check this method if this works as expected, is using the latest API and the response is complete
+func (s *IssueService) SearchWithPost(ctx context.Context, options *SearchWithPostOptions) ([]Issue, *Response, error) {
+	u := url.URL{
+		Path: "rest/api/2/search",
+	}
+
+	req, err := s.client.NewRequestWithContext(ctx, http.MethodPost, u.String(), options)
+	if err != nil {
+		return []Issue{}, nil, err
+	}
+
+	v := new(searchResult)
+	var p []byte
+	fmt.Println(req.Body.Read(p))
+	resp, err := s.client.Do(req, v)
+	if err != nil {
+		err = NewJiraError(resp, err)
+	}
+	return v.Issues, resp, err
+}
+
 // SearchPagesWithContext will get issues from all pages in a search
 //
 // Jira API docs: https://developer.atlassian.com/jiradev/jira-apis/jira-rest-apis/jira-rest-api-tutorials/jira-rest-api-example-query-issues
@@ -1295,15 +1331,17 @@ func (s *IssueService) DoTransitionWithPayload(ticketID, payload interface{}) (*
 }
 
 // InitIssueWithMetaAndFields returns Issue with with values from fieldsConfig properly set.
-//  * metaProject should contain metaInformation about the project where the issue should be created.
-//  * metaIssuetype is the MetaInformation about the Issuetype that needs to be created.
-//  * fieldsConfig is a key->value pair where key represents the name of the field as seen in the UI
-//		And value is the string value for that particular key.
+//   - metaProject should contain metaInformation about the project where the issue should be created.
+//   - metaIssuetype is the MetaInformation about the Issuetype that needs to be created.
+//   - fieldsConfig is a key->value pair where key represents the name of the field as seen in the UI
+//     And value is the string value for that particular key.
+//
 // Note: This method doesn't verify that the fieldsConfig is complete with mandatory fields. The fieldsConfig is
-//		 supposed to be already verified with MetaIssueType.CheckCompleteAndAvailable. It will however return
-//		 error if the key is not found.
-//		 All values will be packed into Unknowns. This is much convenient. If the struct fields needs to be
-//		 configured as well, marshalling and unmarshalling will set the proper fields.
+//
+//	supposed to be already verified with MetaIssueType.CheckCompleteAndAvailable. It will however return
+//	error if the key is not found.
+//	All values will be packed into Unknowns. This is much convenient. If the struct fields needs to be
+//	configured as well, marshalling and unmarshalling will set the proper fields.
 func InitIssueWithMetaAndFields(metaProject *MetaProject, metaIssuetype *MetaIssueType, fieldsConfig map[string]string) (*Issue, error) {
 	issue := new(Issue)
 	issueFields := new(IssueFields)
